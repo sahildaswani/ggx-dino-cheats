@@ -98,6 +98,12 @@
       let i = CHAR_IDS.indexOf(me.char);
       S.disco = setInterval(() => { i = (i + 1) % CHAR_IDS.length; setChar(CHAR_IDS[i]); }, ms);
     },
+    admin() {
+      isAdmin = true;
+      if ($adminTab) $adminTab.hidden = false;
+      document.body.classList.add("is-admin");
+      log("admin UI unlocked (client-side; DB rules still gate writes)");
+    },
   };
   window.cheat = api;
 
@@ -137,6 +143,7 @@
       <div class="row"><input type="number" id="cp-tpx" placeholder="x (0–3200)"><button id="cp-tp">TP</button></div>
       <div class="row"><select id="cp-pl"></select><button class="ghost" id="cp-rf">⟳</button></div>
       <div class="row"><button id="cp-kick" style="flex:1">Kick selected</button></div>
+      <div class="row"><button id="cp-admin" style="flex:1">Unlock admin UI</button></div>
       <div class="log" id="cp-log"></div>
     </div>`;
   document.body.appendChild(p);
@@ -181,6 +188,7 @@
   };
   $q("cp-rf").onclick = refresh;
   $q("cp-kick").onclick = () => { if ($q("cp-pl").value) api.kick($q("cp-pl").value); };
+  $q("cp-admin").onclick = () => api.admin();
   setInterval(refresh, 5000); refresh();
 
   console.log("cheat panel loaded — drag the header, '–' to collapse");
