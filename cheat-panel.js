@@ -7,7 +7,7 @@
   window._cheatPanel = true;
 
   /* ---------------- core cheat state ---------------- */
-  const S = { farm: null, coins: null, flood: null, spdMult: 1, jmpMult: 1, wasGround: true, hooked: false };
+  const S = { farm: null, coins: null, flood: null, disco: null, spdMult: 1, jmpMult: 1, wasGround: true, hooked: false };
   const day = () => todayKey();
 
   // Runs after the game's own rAF each frame; overwrites the mutable
@@ -90,6 +90,14 @@
       log(`chatting as "${name}"`);
     },
     realName() { return api._realName || me.name; },
+    // Disco: cycle all characters on a timer via the game's own setChar(),
+    // so every write is legit-shaped — and fully visible to every client.
+    disco(on, ms = 300, el) {
+      clearInterval(S.disco); S.disco = null;
+      if (!on) return;
+      let i = CHAR_IDS.indexOf(me.char);
+      S.disco = setInterval(() => { i = (i + 1) % CHAR_IDS.length; setChar(CHAR_IDS[i]); }, ms);
+    },
   };
   window.cheat = api;
 
@@ -121,6 +129,7 @@
       <div class="row"><label>Farm (safe pace)</label><input type="checkbox" id="cp-farm"></div>
       <div class="row"><label>Coin vacuum</label><input type="checkbox" id="cp-coins"></div>
       <div class="row"><label>Flood chat</label><input type="checkbox" id="cp-flood"></div>
+      <div class="row"><label>Disco (cycle dinos)</label><input type="checkbox" id="cp-disco"></div>
       <div class="row"><input type="text" id="cp-floodtext" value="spam" placeholder="flood text"></div>
       <div class="row"><input type="text" id="cp-nick" placeholder="chat as…"><button class="ghost" id="cp-nickset">Set</button></div>
       <div class="row"><label>Speed</label><input type="range" id="cp-spd" min="1" max="8" step="0.5" value="1"><span class="val" id="cp-spdv">×1</span></div>
@@ -154,6 +163,7 @@
   $q("cp-farm").onchange = e => { api.farm(e.target.checked, e.target); log(e.target.checked ? "farm on (~4.4 pts/s)" : "farm off"); };
   $q("cp-coins").onchange = e => { api.coins(e.target.checked); log(e.target.checked ? "coin vacuum on" : "coin vacuum off"); };
   $q("cp-flood").onchange = e => { api.flood(e.target.checked, $q("cp-floodtext").value || "spam"); log(e.target.checked ? "flooding — expect a mute" : "flood off"); };
+  $q("cp-disco").onchange = e => { api.disco(e.target.checked); log(e.target.checked ? "disco on (300ms)" : "disco off"); };
   $q("cp-nickset").onclick = () => {
     const v = $q("cp-nick").value.trim();
     api.as(v || api.realName());

@@ -25,6 +25,7 @@ Chrome DevTools → Sources → **Overrides** or a userscript manager.
 | **Farm** | Adds ~4.4 pts/sec through the game's own score-write queue, so every write is indistinguishable from real play. Auto-stops below the admin suspicion thresholds (total 20k / daily 5k). |
 | **Coin vacuum** | Coin spawns are deterministic (seeded PRNG per wave) and claiming is a first-come transaction with no proximity check. Claims every sky + cave coin the instant it spawns, map-wide. |
 | **Flood chat** | The anti-spam rule throttles *writes*, not *messages* — one multi-path `update()` spends a single 1s throttle slot on 20 messages. |
+| **Disco** | Cycles all 4 dino colors every 300ms via the game's own `setChar()` — legit-shaped writes, but your dino strobes on everyone's screen. The last color becomes your saved character. |
 | **Speed slider** | ×1–8 run speed. Hooks the frame loop after physics and re-boosts `me.vx` (the `RUN` const is frozen, but velocity state is mutable). |
 | **Jump slider** | ×1–3 jump power (height scales with the square: ×2 ≈ 14 tiles). Detects the takeoff frame and swaps in a bigger `me.vy`. |
 | **Chat as…** | Impersonation: type a name, hit **Set**, and everything you send through the normal chat box goes out under that name. Empty + Set restores your real name. See below for why this works. |
