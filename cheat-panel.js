@@ -104,6 +104,9 @@
       document.body.classList.add("is-admin");
       log("admin UI unlocked (client-side; DB rules still gate writes)");
     },
+    admins() {
+      return db.ref("admins").once("value").then(s => s.val() || {}).catch(() => null);
+    },
   };
   window.cheat = api;
 
@@ -132,6 +135,8 @@
   p.innerHTML = `
     <div class="hd"><span>🦖 CHEATS</span><button class="ghost" id="cp-min">–</button></div>
     <div class="bd">
+      <div class="row"><label>Online admins</label><span class="val" id="cp-adcount">–</span></div>
+      <div class="row"><select id="cp-admins"></select></div>
       <div class="row"><label>Farm (safe pace)</label><input type="checkbox" id="cp-farm"></div>
       <div class="row"><label>Coin vacuum</label><input type="checkbox" id="cp-coins"></div>
       <div class="row"><label>Flood chat</label><input type="checkbox" id="cp-flood"></div>
@@ -190,6 +195,26 @@
   $q("cp-kick").onclick = () => { if ($q("cp-pl").value) api.kick($q("cp-pl").value); };
   $q("cp-admin").onclick = () => api.admin();
   setInterval(refresh, 5000); refresh();
+
+  // Online admins dropdown = players currently in-world whose uid is in the
+  // whitelist. "Am I an admin?" is decided by me.uid ∈ list (server truth), NOT
+  // the isAdmin flag — the Unlock button fakes that, we don't fake this too.
+  const refreshAdmins = async () => {
+    const sel = $q("cp-admins"), count = $q("cp-adcount"), keep = sel.value;
+    const map = await api.admins();
+    sel.innerHTML = "";
+    if (map === null) { count.textContent = "?"; sel.appendChild(mkOpt("", "admins list unreadable — no permission")); return; }
+    const isAdminUid = uid => map[uid] === true;                 // match checkAdmin's === true
+    const online = new Map();                                    // uid -> username (deduped by person)
+    if (isAdminUid(me.uid)) online.set(me.uid, me.name + " (you)");
+    for (const pl of others.values()) if (isAdminUid(pl.uid) && !online.has(pl.uid)) online.set(pl.uid, pl.name);
+    count.textContent = String(online.size);
+    if (!online.size) { sel.appendChild(mkOpt("", "no admins online")); return; }
+    for (const [uid, name] of online) sel.appendChild(mkOpt(uid, name));   // textContent inside mkOpt: names are spoofable
+    if ([...sel.options].some(o => o.value === keep)) sel.value = keep;
+  };
+  function mkOpt(value, text) { const o = document.createElement("option"); o.value = value; o.textContent = text; return o; }
+  setInterval(refreshAdmins, 5000); refreshAdmins();
 
   console.log("cheat panel loaded — drag the header, '–' to collapse");
 })();
