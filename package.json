@@ -1,0 +1,14 @@
+{
+  "name": "ggx-dino-cheats",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:sahildaswani/ggx-dino-cheats.git",
+  "author": "sahildaswani (https://github.com/sahildaswani)",
+  "contributors": [
+    "michaelyaugogox <michael.yau@gogox.com>"
+  ],
+  "license": "MIT",
+  "scripts": {
+    "fetch-game-src": "node tools/fetch-game-src.js"
+  }
+}
