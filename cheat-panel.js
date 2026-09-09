@@ -80,6 +80,16 @@
       sendInteract("kick", t).then(() => log("kicked " + t.name)).catch(e => log("kick blocked: " + e.message));
     },
     players() { return [...others.values()].map(p => ({ pid: p.pid, name: p.name })); },
+    // Impersonation: rules pin uid to auth.uid, but your display name is
+    // client-chosen and never stored server-side — there is nothing to
+    // validate it against. Every send just reads me.name, so we mutate it.
+    as(name) {
+      api._realName = api._realName || me.name;
+      me.name = name;
+      renderMe();
+      log(`chatting as "${name}"`);
+    },
+    realName() { return api._realName || me.name; },
   };
   window.cheat = api;
 
@@ -112,6 +122,7 @@
       <div class="row"><label>Coin vacuum</label><input type="checkbox" id="cp-coins"></div>
       <div class="row"><label>Flood chat</label><input type="checkbox" id="cp-flood"></div>
       <div class="row"><input type="text" id="cp-floodtext" value="spam" placeholder="flood text"></div>
+      <div class="row"><input type="text" id="cp-nick" placeholder="chat as…"><button class="ghost" id="cp-nickset">Set</button></div>
       <div class="row"><label>Speed</label><input type="range" id="cp-spd" min="1" max="8" step="0.5" value="1"><span class="val" id="cp-spdv">×1</span></div>
       <div class="row"><label>Jump</label><input type="range" id="cp-jmp" min="1" max="3" step="0.25" value="1"><span class="val" id="cp-jmpv">×1</span></div>
       <div class="row"><input type="number" id="cp-tpx" placeholder="x (0–3200)"><button id="cp-tp">TP</button></div>
@@ -143,6 +154,11 @@
   $q("cp-farm").onchange = e => { api.farm(e.target.checked, e.target); log(e.target.checked ? "farm on (~4.4 pts/s)" : "farm off"); };
   $q("cp-coins").onchange = e => { api.coins(e.target.checked); log(e.target.checked ? "coin vacuum on" : "coin vacuum off"); };
   $q("cp-flood").onchange = e => { api.flood(e.target.checked, $q("cp-floodtext").value || "spam"); log(e.target.checked ? "flooding — expect a mute" : "flood off"); };
+  $q("cp-nickset").onclick = () => {
+    const v = $q("cp-nick").value.trim();
+    api.as(v || api.realName());
+    $q("cp-nick").value = ""; $q("cp-nick").placeholder = v ? `as: ${v}` : "chat as…";
+  };
   $q("cp-spd").oninput = e => { api.speed(+e.target.value); $q("cp-spdv").textContent = "×" + e.target.value; };
   $q("cp-jmp").oninput = e => { api.jump(+e.target.value); $q("cp-jmpv").textContent = "×" + e.target.value; };
   $q("cp-tp").onclick = () => { const x = +$q("cp-tpx").value; if (x >= 0) api.tp(x); };
