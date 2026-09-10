@@ -7,7 +7,8 @@
   window._cheatPanel = true;
 
   /* ---------------- core cheat state ---------------- */
-  const S = { farm: null, coins: null, flood: null, disco: null, spdMult: 1, jmpMult: 1, wasGround: true, hooked: false };
+  const S = { farm: null, coins: null, flood: null, disco: null, spdMult: 1, jmpMult: 1, wasGround: true, hooked: false,
+    fly: false, flyX: 0, flyY: 0, flySpd: 200, flyLast: 0 };
   const day = () => todayKey();
 
   // Runs after the game's own rAF each frame; overwrites the mutable
@@ -15,6 +16,7 @@
   function moveHook() {
     requestAnimationFrame(moveHook);
     if (!joined) return;
+    if (S.fly) return flyStep();
     const stunned = performance.now() < me.stunUntil || !!me.hurt;
     if (S.spdMult > 1 && !stunned && !me.crouch) {
       if (keys.has("right")) me.vx = RUN * S.spdMult;
@@ -23,6 +25,26 @@
     if (S.jmpMult !== 1 && S.wasGround && !me.onGround && me.vy < 0 && me.jumpHeld && !me.hurt)
       me.vy = JUMP_V * S.jmpMult;
     S.wasGround = me.onGround;
+  }
+  // Airbreak / free-fly: S.flyX/flyY is OUR authoritative position. Each frame we
+  // pin me.x/me.y to it and zero the velocities, so updateMe()'s gravity + run
+  // integration has nothing to accumulate — the body hovers. WASD drives it:
+  // A/D = ←/→ (the game's left/right keys), S = down, W/Space/↑ = up (jumpHeld).
+  // Note: this pins position, it doesn't disable tile collision — updateMe still
+  // re-collides vertically, so you fly freely through open air but won't tunnel
+  // straight down through solid ground (it resists at the surface).
+  function flyStep() {
+    const t = performance.now();
+    const dt = Math.min(0.05, (t - (S.flyLast || t)) / 1000);
+    S.flyLast = t;
+    let dx = (keys.has("right") ? 1 : 0) - (keys.has("left") ? 1 : 0);
+    let dy = (keys.has("down") ? 1 : 0) - (me.jumpHeld ? 1 : 0);
+    if (dx && dy) { dx *= Math.SQRT1_2; dy *= Math.SQRT1_2; } // even diagonal speed
+    S.flyX = wrapX(S.flyX + dx * S.flySpd * dt);
+    S.flyY = Math.max(0, Math.min(WORLD_H, S.flyY + dy * S.flySpd * dt));
+    me.x = S.flyX; me.y = S.flyY;
+    me.vx = 0; me.vy = 0; me.onGround = false; me.crouch = false;
+    if (dx > 0) me.face = "right"; else if (dx < 0) me.face = "left";
   }
   const ensureHook = () => { if (!S.hooked) { S.hooked = true; requestAnimationFrame(moveHook); } };
 
@@ -71,6 +93,13 @@
     },
     speed(mult) { S.spdMult = mult; ensureHook(); },
     jump(mult) { S.jmpMult = mult; ensureHook(); },
+    // Airbreak: freeze the body mid-air and steer its absolute position with WASD.
+    fly(on) {
+      S.fly = on;
+      if (on) { S.flyX = me.x; S.flyY = me.y; S.flyLast = 0; ensureHook(); log("free-fly on — WASD; W/Space up, S down"); }
+      else { me.vx = me.vy = 0; log("free-fly off — physics restored"); }
+    },
+    flySpeed(px) { S.flySpd = px; },
     tp(x) { me.x = wrapX(x); me.y = landingY(me.x); me.vx = me.vy = 0; syncMe(true); log("tp → " + Math.round(me.x)); },
     // Range is only checked in the button handler (doKick), not here.
     kick(pid) {
@@ -145,6 +174,8 @@
       <div class="row"><input type="text" id="cp-nick" placeholder="chat as…"><button class="ghost" id="cp-nickset">Set</button></div>
       <div class="row"><label>Speed</label><input type="range" id="cp-spd" min="1" max="8" step="0.5" value="1"><span class="val" id="cp-spdv">×1</span></div>
       <div class="row"><label>Jump</label><input type="range" id="cp-jmp" min="1" max="3" step="0.25" value="1"><span class="val" id="cp-jmpv">×1</span></div>
+      <div class="row"><label>Free-fly (WASD)</label><input type="checkbox" id="cp-fly"></div>
+      <div class="row"><label>Fly speed</label><input type="range" id="cp-flyspd" min="60" max="480" step="20" value="200"><span class="val" id="cp-flyspdv">200</span></div>
       <div class="row"><input type="number" id="cp-tpx" placeholder="x (0–3200)"><button id="cp-tp">TP</button></div>
       <div class="row"><select id="cp-pl"></select><button class="ghost" id="cp-rf">⟳</button></div>
       <div class="row"><button id="cp-kick" style="flex:1">Kick selected</button></div>
@@ -183,6 +214,8 @@
   };
   $q("cp-spd").oninput = e => { api.speed(+e.target.value); $q("cp-spdv").textContent = "×" + e.target.value; };
   $q("cp-jmp").oninput = e => { api.jump(+e.target.value); $q("cp-jmpv").textContent = "×" + e.target.value; };
+  $q("cp-fly").onchange = e => api.fly(e.target.checked);
+  $q("cp-flyspd").oninput = e => { api.flySpeed(+e.target.value); $q("cp-flyspdv").textContent = e.target.value; };
   $q("cp-tp").onclick = () => { const x = +$q("cp-tpx").value; if (x >= 0) api.tp(x); };
 
   const refresh = () => {
