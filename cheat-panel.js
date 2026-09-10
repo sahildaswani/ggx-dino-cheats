@@ -8,7 +8,7 @@
 
   /* ---------------- core cheat state ---------------- */
   const S = { farm: null, coins: null, flood: null, disco: null, spdMult: 1, jmpMult: 1, wasGround: true, hooked: false,
-    fly: false, flyX: 0, flyY: 0, flySpd: 200, flyLast: 0 };
+    fly: false, flyX: 0, flyY: 0, flySpd: 200, flyLast: 0, noclip: false };
   const day = () => todayKey();
 
   // Runs after the game's own rAF each frame; overwrites the mutable
@@ -47,6 +47,25 @@
     if (dx > 0) me.face = "right"; else if (dx < 0) me.face = "left";
   }
   const ensureHook = () => { if (!S.hooked) { S.hooked = true; requestAnimationFrame(moveHook); } };
+
+  // Noclip: wrap the game's me-only collision integrator (moveAndCollide). isSolid
+  // is a const arrow we can't touch, so instead we replace the whole pass with the
+  // same gravity/velocity math minus every tile check — the body phases through
+  // solid ground, walls and one-way platforms. Pairs with Free-fly for controlled
+  // phasing; on its own, gravity just drops you through the floor to a respawn.
+  let noclipOK = false;
+  try {
+    const _mac = moveAndCollide;
+    moveAndCollide = function (p, dt) {
+      if (!(S.noclip && p === me)) return _mac(p, dt);
+      p.x = wrapX(p.x + p.vx * dt);
+      p.vy = Math.min(MAX_FALL, p.vy + GRAV * dt);
+      p.y += p.vy * dt;
+      p.onGround = false;
+      if (p.y > WORLD_H + 40) { Object.assign(p, spawnPoint()); p.vy = 0; } // keep the fall-out safety net
+    };
+    noclipOK = true;
+  } catch (e) { console.warn("noclip unavailable — couldn't hook collision: " + e.message); }
 
   const api = {
     // Paced score farm: uses the game's own writeScore queue, so every DB
@@ -100,6 +119,12 @@
       else { me.vx = me.vy = 0; log("free-fly off — physics restored"); }
     },
     flySpeed(px) { S.flySpd = px; },
+    // Noclip: phase through solid tiles (see the moveAndCollide hook). Best with
+    // Free-fly for vertical control — alone, gravity drops you through the floor.
+    noclip(on) {
+      if (!noclipOK) return log("noclip unavailable (collision hook failed)");
+      S.noclip = on; log(on ? "noclip on — phasing solids" : "noclip off");
+    },
     tp(x) { me.x = wrapX(x); me.y = landingY(me.x); me.vx = me.vy = 0; syncMe(true); log("tp → " + Math.round(me.x)); },
     // Range is only checked in the button handler (doKick), not here.
     kick(pid) {
@@ -176,6 +201,7 @@
       <div class="row"><label>Jump</label><input type="range" id="cp-jmp" min="1" max="3" step="0.25" value="1"><span class="val" id="cp-jmpv">×1</span></div>
       <div class="row"><label>Free-fly (WASD)</label><input type="checkbox" id="cp-fly"></div>
       <div class="row"><label>Fly speed</label><input type="range" id="cp-flyspd" min="60" max="480" step="20" value="200"><span class="val" id="cp-flyspdv">200</span></div>
+      <div class="row"><label>Noclip (phase walls)</label><input type="checkbox" id="cp-noclip"></div>
       <div class="row"><input type="number" id="cp-tpx" placeholder="x (0–3200)"><button id="cp-tp">TP</button></div>
       <div class="row"><select id="cp-pl"></select><button class="ghost" id="cp-rf">⟳</button></div>
       <div class="row"><button id="cp-kick" style="flex:1">Kick selected</button></div>
@@ -216,6 +242,8 @@
   $q("cp-jmp").oninput = e => { api.jump(+e.target.value); $q("cp-jmpv").textContent = "×" + e.target.value; };
   $q("cp-fly").onchange = e => api.fly(e.target.checked);
   $q("cp-flyspd").oninput = e => { api.flySpeed(+e.target.value); $q("cp-flyspdv").textContent = e.target.value; };
+  $q("cp-noclip").onchange = e => api.noclip(e.target.checked);
+  if (!noclipOK) { $q("cp-noclip").disabled = true; $q("cp-noclip").title = "collision hook unavailable"; }
   $q("cp-tp").onclick = () => { const x = +$q("cp-tpx").value; if (x >= 0) api.tp(x); };
 
   const refresh = () => {
